@@ -428,10 +428,14 @@ const mig=o=>{o={...o};
   if(Array.isArray(o.blocks)){['bio','ct','ft'].forEach(k=>{if(!o.blocks.some(b=>b.k===k))o.blocks.push({k})});if(!o.blocks.some(b=>b.k==='qa'))o.blocks.unshift({k:'qa'})}
   return o};
 const load=o=>{o=mig(o);S={...DEF(),...o};delete S.css;if(S.tpl==='mag')S.tpl='retro';if(!TPL[S.tpl])S.tpl='cover';if(!FONTS[S.font])S.font='sans';if(!FONTS[S.bf])S.bf='sans';S.c={...TPL[S.tpl].p,...(o.c||{})};S.al={...DEF().al,...(o.al||{})}};
-try{load(JSON.parse(store.get(KEY)||store.get('card_studio_v8')||'{}'))}catch(e){}
+try{
+  const loc=JSON.parse(store.get(KEY)||store.get('card_studio_v8')||'{}'),pub=window.__PUB__;
+  /* 發佈版內嵌的資料：本機沒有編輯紀錄，或發佈時間比本機儲存更新時，以發佈版為準 */
+  load(pub&&(!loc._ts||loc._ts<pub._ts)?pub:loc);
+}catch(e){}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const save=()=>{try{store.set(KEY,JSON.stringify(S))}catch(e){toast('儲存空間不足，請換較小的圖片')}};
+const save=()=>{try{S._ts=Date.now();store.set(KEY,JSON.stringify(S))}catch(e){toast('儲存空間不足，請換較小的圖片')}};
 function toast(m,ms=2200){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),ms)}
 function href(l){const u=(l.url||'').trim();if(!u||u==='#')return'#';if(l.type==='tel')return'tel:'+u;if(l.type==='mail')return'mailto:'+u;return/^https?:\/\//i.test(u)?u:'https://'+u.replace(/^[a-z]+:\/*/i,'')}
 const lum=h=>{const n=parseInt(h.slice(1),16);const c=[n>>16,n>>8&255,n&255].map(v=>{v/=255;return v<=.03928?v/12.92:((v+.055)/1.055)**2.4});return .2126*c[0]+.7152*c[1]+.0722*c[2]};
@@ -459,7 +463,7 @@ function colors(){
   const pu=S.pbg||(PAGE[S.tpl]?art('p'+S.tpl+ck,()=>PAGE[S.tpl](c)):'');
   r.style.setProperty('--pbg',pu?`url("${pu}")`:'none');
   r.style.setProperty('--pbs',S.pbg?'cover':'100% auto');
-  r.style.setProperty('--bandimg',`url("${art('b'+ck,()=>BAND(c))}")`);
+  r.style.setProperty('--bandimg',S.bg?`url("${S.bg}")`:`url("${art('b'+ck,()=>BAND(c))}")`);
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=c.bg;
 }
 function blocksHtml(ct,qa){
@@ -480,7 +484,7 @@ function render(){
   colors();
   document.title=(S.name||'數位名片')+' 的數位名片';
   const av=S.avatar?`<img src="${esc(S.avatar)}" style="object-position:50% ${+S.ay}%" alt="">`:esc((S.name||'?').trim()[0]||'?');
-  const cv=`<div class="cv" style="background-image:url('${esc(PH(S.hdr)?(S.bg||S.avatar||art('s'+S.c.ac,()=>SIL(S.c))):coverUrl())}')"></div>`;
+  const cv=`<div class="cv" style="background-image:url('${esc(PH(S.hdr)?(S.avatar||S.bg||art('s'+S.c.ac,()=>SIL(S.c))):coverUrl())}')"></div>`;
   const ct=[S.phone&&`<a href="tel:${esc(S.phone)}">${ico(P.ph)}<span>${esc(S.phone)}</span></a>`,S.email&&`<a href="mailto:${esc(S.email)}">${ico(P.ml)}<span>${esc(S.email)}</span></a>`,S.site&&`<a href="${esc(href({url:S.site}))}" target="_blank" rel="noopener">${ico(P.gl)}<span>${esc(S.site.replace(/^https?:\/\//,''))}</span></a>`,S.addr&&`<div>${ico(P.mp)}<span>${esc(S.addr)}</span></div>`].filter(Boolean).join('');
   const qa=[S.phone&&['通話','tel:'+S.phone,P.ph],S.email&&['郵件','mailto:'+S.email,P.ml],S.addr&&['導航','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(S.addr),P.mp],S.site&&['網站',href({url:S.site}),P.gl]].filter(Boolean);
   $('#card').innerHTML=`
@@ -641,9 +645,9 @@ function form(){
   const alp=(k,l)=>`${sl(l)}<div class="chs c3">${AL3.map(([v,n])=>`<button class="ch${(k==='all'?Object.values(S.al).every(x=>x===v):S.al[k]===v)?' on':''}" data-al="${k}|${v}">${svgi('al',v)}<span>${n}</span></button>`).join('')}</div>`;
   let h='';
   if(tab===0){
-    const brandSum=[S.avatar&&'頭像',S.logo&&'LOGO',S.bg&&'封面／照片',S.pbg&&'背景圖'].filter(Boolean).join('・')||'尚未上傳圖片';
-    h=ac('brand','🖼️','品牌形象',brandSum,`<div class="slots">${slot('頭像','avatar',S.avatar,'人像或個人照')}${slot('品牌 LOGO','logo',S.logo,'顯示在名片頁尾')}${slot('封面／照片背景','bg',S.bg,'人像頭部優先使用此圖')}${slot('頁面背景圖','pbg',S.pbg,'選填，鋪滿整個頁面')}</div>
-    ${S.avatar?rng('頭像上下位置','ay',S.ay):''}${S.bg||(photo&&S.avatar)?rng('照片上下位置（調整臉的位置）','fy',S.fy):''}`)
+    const brandSum=[S.avatar&&'頭像',S.logo&&'LOGO',S.bg&&'封面',S.pbg&&'背景圖'].filter(Boolean).join('・')||'尚未上傳圖片';
+    h=ac('brand','🖼️','品牌形象',brandSum,`<div class="slots">${slot('頭像／人像照','avatar',S.avatar,'人像版型的主照片')}${slot('品牌 LOGO','logo',S.logo,'顯示在名片頁尾')}${slot('封面圖','bg',S.bg,'封面圖／色塊頭部使用')}${slot('頁面背景圖','pbg',S.pbg,'選填，鋪滿整個頁面')}</div>
+    ${S.avatar?rng('頭像上下位置','ay',S.ay):''}${(photo&&(S.avatar||S.bg))||(!photo&&S.bg&&/^(cover|band)$/.test(S.hdr))?rng(photo?'照片上下位置（調整臉的位置）':'封面上下位置','fy',S.fy):''}`)
     +ac('info','📝','基本資料',[S.name,S.title].filter(Boolean).join(' · ')||'尚未填寫',`${inp('姓名','name',S.name)}${inp('職稱','title',S.title)}${inp('公司／品牌','company',S.company)}${inp('一句話簡介','tag',S.tag)}<label>個人簡介<textarea data-p="bio">${esc(S.bio)}</textarea></label>`)
     +ac('contact','📞','聯絡資訊',[S.phone,S.email,S.site].filter(Boolean).join(' · ')||'尚未填寫',`${inp('電話','phone',S.phone)}${inp('Email','email',S.email)}${inp('地址','addr',S.addr)}${inp('統一編號','taxId',S.taxId)}${inp('網站','site',S.site,'url')}`)
     +ac('blocks','🧩','頁面內容順序',`${S.blocks.length} 個區塊・用 ↑↓ 排序，點一下展開編輯`,`${S.blocks.map(rowB).join('')}<div class="row"><button class="gb main" data-add="link">＋ 新增連結</button><button class="gb main" data-add="text">＋ 圖文區塊</button></div>`)
@@ -654,13 +658,13 @@ function form(){
     h=`${sec('版型','套用後會保留你的文字內容。人像版型請到「內容」上傳照片。')}
   <div class="tcs">${Object.entries(TC).map(([k,n])=>`<button class="tc${tcat===k?' on':''}" data-tc="${k}" aria-pressed="${tcat===k}">${n}</button>`).join('')}</div>
   <div class="tp">${lst.map(k=>`<button data-tpl="${k}" aria-pressed="${S.tpl===k}" class="${S.tpl===k?'on':''}">${mini(k)}${TPL[k].n}</button>`).join('')}</div>
-  ${PH(S.hdr)&&!S.avatar&&!S.bg?`<div class="nt"><b>還沒有人像照片</b><span>目前顯示的是示意剪影，上傳後會自動套進這個版型。</span><button class="gb main" data-go="0:brand">上傳我的照片</button></div>`:''}
+  ${PH(S.hdr)&&!S.avatar?`<div class="nt"><b>還沒有人像照片</b><span>目前顯示的是示意剪影，上傳後會自動套進這個版型。</span><button class="gb main" data-go="0:brand">上傳我的照片</button></div>`:''}
   ${sec('配色方案','一鍵套用整組顏色；想單獨改某一項，到「設計」分頁對應物件旁邊調整。')}<div class="sw">${PRESETS.map((p,i)=>`<button data-pre="${i}" class="${p[0]===S.c.bg&&p[1]===S.c.sf&&p[2]===S.c.fg&&p[3]===S.c.ac?'on':''}" aria-label="配色 ${i+1}" style="background:linear-gradient(135deg,${p[0]} 50%,${p[3]} 50%)"></button>`).join('')}</div>`;
   }
   else if(tab===2){
     h=ac('hdr','👤','頭部',`${LB.hdr[S.hdr]}${fixLay?'':' · '+LB.lay[S.lay]}${photo?'':' · '+LB.av[S.av]+'頭像'}`,
       `${sl('一般頭部')}${pick('hdr','hdr',[['none','無'],['cover','封面圖'],['band','色塊']])}${sl('人像頭部')}${pick('hdr','hdr',[['photo','照片背景'],['photoc','照片卡片'],['photofull','滿版照片'],['ptarch','拱形人像'],['ptside','側邊人像'],['ptpola','拍立得'],['ptring','圓環人像']])}
-      ${photo&&!S.bg&&!S.avatar?`<p class="hint" style="margin-top:10px;color:#c2410c">要用你的人像：請先上傳照片。</p><button class="gb" data-go="0:brand">到「內容」上傳照片</button>`:''}
+      ${photo&&!S.avatar?`<p class="hint" style="margin-top:10px;color:#c2410c">要用你的人像：請先上傳照片。</p><button class="gb" data-go="0:brand">到「內容」上傳照片</button>`:''}
       ${fixLay?'':`${sl('文字排版')}${pick('lay','lay',[['left','靠左'],['center','置中'],['right','靠右']])}`}
       ${photo?'':`${sl('頭像形狀')}${pick('av','av',[['circle','圓形'],['rounded','圓角'],['square','方形'],['blob','水滴']],4)}${rng('頭像大小','avs',S.avs,56,140)}`}`)
     +ac('bg','🌄','頁面背景',`${LB.bgm[S.bgm]} · ${S.c.bg.toUpperCase()}`,
@@ -683,10 +687,31 @@ function form(){
   <h4>備份與還原</h4>
   <p class="hint">資料存在這個瀏覽器裡。換電腦或清除瀏覽器資料前，請先備份。</p>
   <div class="fl"><button class="gb" id="bk">下載備份檔</button></div>
+  <h4>發佈名片</h4>
+  <p class="hint">編輯資料只存在目前這個瀏覽器，別的裝置看不到。編輯完請按「下載發佈版」，把下載的 HTML 上傳到網站取代舊檔，分享連結才會是你編輯後的內容。</p>
+  <div class="fl"><button class="gb main" id="pub">下載發佈版 HTML</button></div>
   <label style="margin-top:10px">還原備份<input type="file" accept=".json,application/json" id="rt"></label>`}
   $('#form').innerHTML=h;$('#form').scrollTop=st;
 }
 function walk(path){const k=path.split('.');let o=S;k.slice(0,-1).forEach(x=>o=o[x]);return[o,k.at(-1)]}
+function exportPub(){
+  S._ts=Date.now();save();
+  const d=document.documentElement.cloneNode(true);
+  ['style','data-hdr','data-lay','data-av','data-box','data-lnk','data-lyt','data-bgm'].forEach(a=>d.removeAttribute(a));
+  d.setAttribute('data-t','cover');
+  ['#card','#form','#seg','#mb','#qrb'].forEach(q=>{const e=d.querySelector(q);if(e)e.innerHTML=''});
+  d.querySelector('body').removeAttribute('class');d.querySelector('body').removeAttribute('style');
+  const sh=d.querySelector('#sheet');sh.removeAttribute('class');sh.removeAttribute('style');
+  d.querySelector('#modal').setAttribute('hidden','');
+  d.querySelector('#toast').className='toast';d.querySelector('#toast').textContent='';
+  d.querySelectorAll('link[href*="fonts.googleapis.com/css2"]').forEach(x=>x.remove());
+  d.querySelectorAll('#pub-data').forEach(x=>x.remove());
+  const ps=document.createElement('script');ps.id='pub-data';
+  ps.textContent='window.__PUB__='+JSON.stringify(S).replace(/</g,'\\u003c')+';';
+  d.querySelector('#js').before(ps);
+  download('index.html','<!DOCTYPE html>\n'+d.outerHTML,'text/html');
+  toast('已下載發佈版，請上傳取代網站上的舊檔',3200);
+}
 function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 
 /* ===== 圖片裁切／縮放：拖曳移動、滑桿／雙指／滾輪縮放、可選比例 ===== */
@@ -694,7 +719,8 @@ const CR=[['1:1',1],['4:5',.8],['3:4',.75],['9:16',.5625],['3:2',1.5],['16:9',1.
 function cropDefault(key){
   if(key==='logo')return 0;
   if(key==='pbg')return .5625;
-  if(key==='bg'){const h=S.hdr;return h==='cover'||h==='band'?2:({ptarch:.75,ptside:.75,ptpola:.8,photofull:.75}[h]||1)}
+  if(key==='bg')return 2;
+  if(key==='avatar'&&PH(S.hdr))return({ptarch:.75,ptside:.75,ptpola:.8,photofull:.75}[S.hdr]||1);
   return 1;
 }
 function openCrop(key,src){
@@ -786,8 +812,9 @@ $('#sheet').addEventListener('click',async e=>{
   if(d.go){const[t,id]=d.go.split(':');tab=+t;acc[t]=id;form();$('#form').scrollTop=0;return}
   if(b.id==='bk'){download((S.name||'card')+'-備份.json',JSON.stringify(S),'application/json');toast('已下載備份檔');return}
   if(b.id==='cp'){viewChangePw();return}
+  if(b.id==='pub'){exportPub();return}
   if(d.crop){const[o,k]=walk(d.crop);if(o[k])openCrop(d.crop,o[k]);return}
-    if(d.tpl){Object.assign(S,base(d.tpl));S.pbg='';toast('已套用「'+TPL[d.tpl].n+'」'+(PH(S.hdr)&&!S.avatar&&!S.bg?'，上傳照片就會看到人像':''),2600)}
+    if(d.tpl){const kp=S.pbg;Object.assign(S,base(d.tpl));S.pbg=kp;if(kp)S.bgm='image';toast('已套用「'+TPL[d.tpl].n+'」'+(PH(S.hdr)&&!S.avatar?'，上傳照片就會看到人像':''),2600)}
   if(d.pre){const p=PRESETS[+d.pre];S.c={bg:p[0],sf:p[1],fg:p[2],ac:p[3]}}
   if(d.o){const[k,v]=d.o.split('|');S[k]=v}
   if(d.tg)S[d.tg]=!S[d.tg];
